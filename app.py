@@ -277,19 +277,18 @@ def render_sidebar(vector_store: VectorStoreManager) -> None:
 
     # --- Search & Ingest ---
     st.sidebar.subheader("Search & Ingest")
-    default_topic = st.session_state.pop("prefill_topic", "")
-    topic = st.sidebar.text_input(
-        "Enter a research topic", value=default_topic, key="topic_input"
-    )
+    # An example chip queues a topic; apply it to the widget BEFORE instantiation
+    # (Streamlit forbids modifying a widget's state after it is created).
+    auto_fetch = False
+    if "pending_topic" in st.session_state:
+        st.session_state["topic_input"] = st.session_state.pop("pending_topic")
+        auto_fetch = True
+
+    topic = st.sidebar.text_input("Enter a research topic", key="topic_input")
     num_papers = st.sidebar.number_input(
         "Number of papers to fetch", min_value=1, max_value=10, value=5, step=1
     )
-    if st.sidebar.button("🔎 Fetch Papers", use_container_width=True):
-        ingest_topic(vector_store, topic, int(num_papers))
-        st.rerun()
-
-    # Auto-trigger ingestion when an example chip was clicked.
-    if st.session_state.pop("auto_fetch", False):
+    if st.sidebar.button("🔎 Fetch Papers", use_container_width=True) or auto_fetch:
         ingest_topic(vector_store, topic, int(num_papers))
         st.rerun()
 
@@ -364,8 +363,7 @@ def render_empty_state() -> None:
     for col, topic in zip(cols, EXAMPLE_TOPICS):
         with col:
             if st.button(topic, use_container_width=True, key=f"chip_{topic}"):
-                st.session_state["prefill_topic"] = topic
-                st.session_state["auto_fetch"] = True
+                st.session_state["pending_topic"] = topic
                 st.rerun()
 
 
