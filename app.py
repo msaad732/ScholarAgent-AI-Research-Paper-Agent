@@ -122,16 +122,28 @@ def analyze_uploaded_papers(vector_store: VectorStoreManager, files: list, num_r
 
     reviews = st.session_state.setdefault("reviews", {})
     done = 0
+    skipped = 0
     for file in files:
+        file_bytes = file.getvalue()
+        with st.spinner(f"Reading '{truncate(file.name, 30)}'…"):
+            ingested = ingest_uploaded_pdf(vector_store, file_bytes, file.name)
+        if not ingested:
+            st.sidebar.error(f"Could not read '{file.name}'. Skipping.")
+            continue
+
+        publish_to_static(ingested["paper_id"], file_bytes)
+        st.session_state["current_review"] = ingested["paper_id"]
+
+        # Already reviewed this session → reuse it; don't spend another LLM call.
+        if ingested["paper_id"] in reviews:
+            skipped += 1
+            continue
+
+        # New paper needs a review (related-work fetch + LLM call) — gate on the cap.
         if not get_global_limiters()["chat_daily"].allow():
             st.sidebar.warning("Daily free-tier cap reached — stopping here.")
             break
-        file_bytes = file.getvalue()
-        with st.spinner(f"Reading '{truncate(file.name, 30)}' and fetching related work…"):
-            ingested = ingest_uploaded_pdf(vector_store, file_bytes, file.name)
-            if not ingested:
-                st.sidebar.error(f"Could not read '{file.name}'. Skipping.")
-                continue
+        with st.spinner(f"Fetching related work and reviewing '{truncate(ingested['title'], 30)}'…"):
             result = generate_review(
                 vector_store,
                 ingested["paper_id"],
@@ -139,7 +151,6 @@ def analyze_uploaded_papers(vector_store: VectorStoreManager, files: list, num_r
                 ingested["text"],
                 num_related,
             )
-        publish_to_static(ingested["paper_id"], file_bytes)
         reviews[ingested["paper_id"]] = {
             "paper_id": ingested["paper_id"],
             "title": ingested["title"],
@@ -149,12 +160,16 @@ def analyze_uploaded_papers(vector_store: VectorStoreManager, files: list, num_r
             "sources": result["sources"],
             "metrics": result.get("metrics", []),
         }
-        st.session_state["current_review"] = ingested["paper_id"]
         done += 1
 
     if done:
         st.sidebar.success(
             f"Reviewed {done} paper(s) — see the **📄 My Paper & Review** tab."
+        )
+    if skipped:
+        st.sidebar.info(
+            f"{skipped} paper(s) were already analyzed — showing the existing review. "
+            "Remove and re-upload to force a fresh analysis."
         )
 
 
