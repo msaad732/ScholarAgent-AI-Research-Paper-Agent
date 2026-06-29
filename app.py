@@ -709,7 +709,7 @@ def _stream_or_answer(
             }
 
     # All papers: run the agent non-streamed (reliable tool calls).
-    agent = get_agent(vector_store)
+    agent = get_agent(get_session_id(), vector_store)
     history = st.session_state["messages"][:-1]
     paper_context = build_paper_context(vector_store)
     result = run_agent(agent, prompt, history, paper_context=paper_context)
