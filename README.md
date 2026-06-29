@@ -3,7 +3,7 @@
 > Point it at a topic → it builds a knowledge base → ask anything across all papers.
 > Or upload your own paper and get a grounded improvement review.
 
-🔗 **[Live Demo](https://scholaragent.streamlit.app)** | 📖 [How it works](#architecture)
+🔗 **[Live Demo]([https://scholaragent.streamlit.app](https://scholar-agent-ai-research.streamlit.app/))** | 📖 [How it works](#architecture)
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
