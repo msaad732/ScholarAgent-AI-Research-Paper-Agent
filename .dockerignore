@@ -1,0 +1,17 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+tests/
+docs/
+data/papers/
+chroma_db/
+static/*.pdf
+.env
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
