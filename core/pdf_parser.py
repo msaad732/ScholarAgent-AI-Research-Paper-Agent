@@ -41,6 +41,12 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         return ""
 
     try:
+        # Many PDFs are flagged encrypted with an empty owner password; try that.
+        if getattr(doc, "needs_pass", False):
+            doc.authenticate("")
+        if getattr(doc, "needs_pass", False):
+            logger.warning("PDF %s is password-protected; cannot extract text", pdf_path)
+            return ""
         pages = [page.get_text("text") for page in doc]
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed extracting text from %s: %s", pdf_path, exc)

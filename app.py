@@ -128,7 +128,11 @@ def analyze_uploaded_papers(vector_store: VectorStoreManager, files: list, num_r
         with st.spinner(f"Reading '{truncate(file.name, 30)}'…"):
             ingested = ingest_uploaded_pdf(vector_store, file_bytes, file.name)
         if not ingested:
-            st.sidebar.error(f"Could not read '{file.name}'. Skipping.")
+            st.sidebar.error(
+                f"Could not extract text from '{truncate(file.name, 30)}'. It may be "
+                "empty, corrupted, password-protected, or a scanned image with no "
+                "text layer. Skipping."
+            )
             continue
 
         publish_to_static(ingested["paper_id"], file_bytes)
