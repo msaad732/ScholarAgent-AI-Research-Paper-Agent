@@ -71,47 +71,56 @@ def markdown_to_pdf_bytes(markdown_text: str, title: str) -> bytes | None:
         logger.error("fpdf2 not available for PDF export: %s", exc)
         return None
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
+    try:
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
 
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.multi_cell(0, 9, _sanitize(title))
-    pdf.ln(2)
+        # wrapmode="CHAR" lets very long unbreakable tokens (URLs, ids) wrap by
+        # character instead of raising "not enough horizontal space".
+        def write(height: float, text: str) -> None:
+            pdf.multi_cell(0, height, text, wrapmode="CHAR")
 
-    for raw in markdown_text.splitlines():
-        line = _sanitize(raw.rstrip())
-        stripped = line.strip()
-        if not stripped:
-            pdf.ln(3)
-            continue
-        if stripped.startswith("# "):
-            pdf.set_font("Helvetica", "B", 15)
-            pdf.ln(2)
-            pdf.multi_cell(0, 8, stripped[2:])
-        elif stripped.startswith("### "):
-            pdf.set_font("Helvetica", "B", 12)
-            pdf.ln(1)
-            pdf.multi_cell(0, 7, stripped[4:])
-        elif stripped.startswith("## "):
-            pdf.set_font("Helvetica", "B", 13)
-            pdf.ln(2)
-            pdf.multi_cell(0, 7, stripped[3:])
-        elif stripped.startswith(("- ", "* ")):
-            pdf.set_font("Helvetica", "", 11)
-            pdf.multi_cell(0, 6, f"  - {stripped[2:]}")
-        elif re.match(r"^\d+\.\s", stripped):
-            pdf.set_font("Helvetica", "", 11)
-            pdf.multi_cell(0, 6, f"  {stripped}")
-        elif stripped.startswith("|"):
-            # Render table rows as plain " | "-separated text (skip separators).
-            if set(stripped) <= set("|-: "):
+        pdf.set_font("Helvetica", "B", 16)
+        write(9, _sanitize(title))
+        pdf.ln(2)
+
+        for raw in markdown_text.splitlines():
+            line = _sanitize(raw.rstrip())
+            stripped = line.strip()
+            if not stripped:
+                pdf.ln(3)
                 continue
-            cells = [c.strip() for c in stripped.strip("|").split("|")]
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 6, " | ".join(cells))
-        else:
-            pdf.set_font("Helvetica", "", 11)
-            pdf.multi_cell(0, 6, stripped)
+            if stripped.startswith("# "):
+                pdf.set_font("Helvetica", "B", 15)
+                pdf.ln(2)
+                write(8, stripped[2:])
+            elif stripped.startswith("### "):
+                pdf.set_font("Helvetica", "B", 12)
+                pdf.ln(1)
+                write(7, stripped[4:])
+            elif stripped.startswith("## "):
+                pdf.set_font("Helvetica", "B", 13)
+                pdf.ln(2)
+                write(7, stripped[3:])
+            elif stripped.startswith(("- ", "* ")):
+                pdf.set_font("Helvetica", "", 11)
+                write(6, f"  - {stripped[2:]}")
+            elif re.match(r"^\d+\.\s", stripped):
+                pdf.set_font("Helvetica", "", 11)
+                write(6, f"  {stripped}")
+            elif stripped.startswith("|"):
+                # Render table rows as plain " | "-separated text (skip separators).
+                if set(stripped) <= set("|-: "):
+                    continue
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                pdf.set_font("Helvetica", "", 10)
+                write(6, " | ".join(cells))
+            else:
+                pdf.set_font("Helvetica", "", 11)
+                write(6, stripped)
 
-    return bytes(pdf.output())
+        return bytes(pdf.output())
+    except Exception as exc:  # noqa: BLE001 - never let PDF export crash the app
+        logger.error("PDF export failed: %s", exc)
+        return None
