@@ -1,10 +1,12 @@
 """ScholarAgent — Streamlit frontend and main entry point."""
 import os
+import uuid
 
 import streamlit as st
 
 from config import (
     ANALYZE_LIMIT_PER_SESSION,
+    COLLECTION_NAME,
     DAILY_WINDOW,
     FETCH_LIMIT_PER_SESSION,
     GROQ_API_KEY,
@@ -45,15 +47,26 @@ st.set_page_config(
 )
 
 
-@st.cache_resource(show_spinner=False)
-def get_vector_store() -> VectorStoreManager:
-    """Return a process-wide cached vector store manager."""
-    return VectorStoreManager()
+def get_session_id() -> str:
+    """Return a stable per-browser-session id (created once per session)."""
+    if "session_id" not in st.session_state:
+        st.session_state["session_id"] = uuid.uuid4().hex[:12]
+    return st.session_state["session_id"]
 
 
-@st.cache_resource(show_spinner=False)
-def get_agent(_vector_store: VectorStoreManager):
-    """Return a cached compiled agent bound to the vector store."""
+@st.cache_resource(show_spinner=False, max_entries=100)
+def get_vector_store(session_id: str) -> VectorStoreManager:
+    """Return a vector store with a per-session collection (isolated per user)."""
+    return VectorStoreManager(collection_name=f"{COLLECTION_NAME}_{session_id}")
+
+
+@st.cache_resource(show_spinner=False, max_entries=100)
+def get_agent(session_id: str, _vector_store: VectorStoreManager):
+    """Return a compiled agent bound to this session's vector store.
+
+    ``session_id`` is the cache key; ``_vector_store`` is excluded from hashing
+    (leading underscore) but used to build the agent.
+    """
     return build_agent(_vector_store)
 
 
@@ -775,7 +788,7 @@ def _answer_query(
                 "sources": rag["sources"],
             }
 
-        agent = get_agent(vector_store)
+        agent = get_agent(get_session_id(), vector_store)
         history = st.session_state["messages"][:-1]
         paper_context = build_paper_context(vector_store)
         result = run_agent(agent, prompt, history, paper_context=paper_context)
@@ -845,7 +858,7 @@ def main() -> None:
             "Get a free key at https://console.groq.com."
         )
 
-    vector_store = get_vector_store()
+    vector_store = get_vector_store(get_session_id())
     render_sidebar(vector_store)
 
     # Header stats strip + About expander.

@@ -22,8 +22,13 @@ logger = get_logger(__name__)
 class VectorStoreManager:
     """Manage a persistent ChromaDB collection of research-paper chunks."""
 
-    def __init__(self) -> None:
-        """Initialise the persistent client, embedding function, and collection."""
+    def __init__(self, collection_name: str = COLLECTION_NAME) -> None:
+        """Initialise the persistent client, embedding function, and collection.
+
+        Args:
+            collection_name: ChromaDB collection to use. Pass a per-session name
+                to isolate each user's knowledge base.
+        """
         os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
         self.client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
         # Local sentence-transformers embeddings — no API key required.
@@ -31,11 +36,11 @@ class VectorStoreManager:
             model_name=EMBEDDING_MODEL
         )
         self.collection = self.client.get_or_create_collection(
-            name=COLLECTION_NAME,
+            name=collection_name,
             embedding_function=self.embedding_fn,
             metadata={"hnsw:space": "cosine"},
         )
-        logger.info("VectorStoreManager ready (collection=%s)", COLLECTION_NAME)
+        logger.info("VectorStoreManager ready (collection=%s)", collection_name)
 
     def add_paper(self, chunks: list[dict]) -> int:
         """Add a paper's chunks to the collection, skipping already-indexed papers.
