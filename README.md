@@ -7,15 +7,25 @@
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![CI](https://github.com/your-username/ScholarAgent/actions/workflows/ci.yml/badge.svg)
-
-![ScholarAgent Demo](docs/images/demo.png)
-
-> **Screenshots:** add images to `docs/images/` — e.g. `demo.png` (chat),
-> `review.png` (My Paper & Review), `compare.png` (Compare tab) — and reference
-> them here.
+![CI](https://github.com/msaad732/ScholarAgent-AI-Research-Paper-Agent/actions/workflows/ci.yml/badge.svg)
 
 ScholarAgent is an AI-powered research assistant that autonomously fetches academic papers from arxiv, ingests them into a vector store, and lets you have intelligent conversations across the entire corpus. It goes beyond basic RAG with an **agentic layer** — a LangGraph ReAct agent that decides when to fetch more papers, compare methodologies, and extract metrics. You can also **upload your own paper** and get a structured, grounded review against related work.
+
+---
+
+## 📸 Screenshots
+
+**Chat — agentic Q&A across your papers**
+
+![Chat](docs/images/demo.png)
+
+**My Paper & Review — upload a PDF, get a grounded review**
+
+![My Paper & Review](docs/images/review.png)
+
+**Compare — side-by-side comparison + metrics matrix**
+
+![Compare](docs/images/compare.png)
 
 ---
 
