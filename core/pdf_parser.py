@@ -73,6 +73,7 @@ def extract_title_from_pdf(pdf_path: str) -> str | None:
     try:
         page = doc[0]
         data = page.get_text("dict")
+        page_height = page.rect.height  # read BEFORE closing the document
     except Exception as exc:  # noqa: BLE001
         logger.error("Title detection failed for %s: %s", pdf_path, exc)
         return None
@@ -94,7 +95,7 @@ def extract_title_from_pdf(pdf_path: str) -> str | None:
     # The title is usually the largest font on the page; join spans at that size,
     # in reading order, but only those in the top half of the page.
     max_size = max(s[0] for s in spans)
-    page_height = page.rect.height if hasattr(page, "rect") else 1000
+    page_height = page_height or 1000
     title_parts = [
         txt
         for size, txt, y in sorted(spans, key=lambda s: s[2])
