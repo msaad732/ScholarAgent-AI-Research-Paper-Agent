@@ -3,9 +3,8 @@ title: ScholarAgent
 emoji: 📚
 colorFrom: indigo
 colorTo: blue
-sdk: streamlit
-app_file: app.py
-python_version: "3.12"
+sdk: docker
+app_port: 8501
 pinned: false
 license: mit
 ---
