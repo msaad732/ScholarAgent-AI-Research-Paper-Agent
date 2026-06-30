@@ -918,10 +918,54 @@ def _render_meta(meta: dict) -> None:
                     )
 
 
+_CSS = """
+<style>
+/* Cleaner chrome + roomier layout */
+#MainMenu, footer {visibility: hidden;}
+.block-container {padding-top: 1.4rem; padding-bottom: 2.5rem; max-width: 1120px;}
+
+/* Hero banner */
+.sa-hero {
+    background: linear-gradient(120deg, #1B2A4A 0%, #2E4A7D 55%, #3E6BB0 100%);
+    color: #ffffff; border-radius: 16px; padding: 1.4rem 1.8rem; margin-bottom: 1.1rem;
+    box-shadow: 0 8px 24px rgba(27, 42, 74, 0.18);
+}
+.sa-hero h1 {margin: 0; font-size: 1.75rem; font-weight: 750; color: #fff; letter-spacing: -0.3px;}
+.sa-hero p {margin: 0.4rem 0 0; opacity: 0.92; font-size: 0.98rem; line-height: 1.45;}
+
+/* Buttons */
+.stButton > button, .stDownloadButton > button {
+    border-radius: 9px; border: 1px solid #d9dee8; font-weight: 600;
+    transition: border-color .15s ease, transform .05s ease;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {border-color: #1B2A4A;}
+.stButton > button:active {transform: translateY(1px);}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background: #F5F7FA; border: 1px solid #e7ebf3; border-radius: 12px; padding: 0.7rem 1rem;
+}
+[data-testid="stMetricValue"] {color: #1B2A4A; font-weight: 700;}
+
+/* Pill-style tabs */
+.stTabs [data-baseweb="tab-list"] {gap: 0.4rem;}
+.stTabs [data-baseweb="tab"] {border-radius: 8px 8px 0 0; padding: 0.4rem 0.9rem; font-weight: 600;}
+
+/* Softer expanders */
+[data-testid="stExpander"] {border-radius: 10px;}
+</style>
+"""
+
+
 def main() -> None:
     """Application entry point."""
-    st.title("📚 ScholarAgent — AI Research Paper Agent")
-    st.caption("Point it at a topic → it builds a knowledge base → ask anything across all papers.")
+    st.markdown(_CSS, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sa-hero"><h1>📚 ScholarAgent</h1>'
+        "<p>Point it at a topic → it builds a knowledge base → ask anything across "
+        "all papers. Or upload your own paper for a grounded improvement review.</p></div>",
+        unsafe_allow_html=True,
+    )
 
     if not GROQ_API_KEY:
         st.error(
