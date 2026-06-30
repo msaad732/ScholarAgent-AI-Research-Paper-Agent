@@ -54,10 +54,39 @@ def get_session_id() -> str:
     return st.session_state["session_id"]
 
 
+@st.cache_resource(show_spinner=False)
+def get_chroma_client():
+    """Return a single shared ChromaDB client (one per process)."""
+    import chromadb
+
+    from config import CHROMA_PERSIST_DIR
+
+    os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
+    return chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+
+
+@st.cache_resource(show_spinner=False)
+def get_embedding_fn():
+    """Return a single shared embedding model (loaded once per process)."""
+    from chromadb.utils import embedding_functions
+
+    from config import EMBEDDING_MODEL
+
+    return embedding_functions.SentenceTransformerEmbeddingFunction(model_name=EMBEDDING_MODEL)
+
+
 @st.cache_resource(show_spinner=False, max_entries=100)
 def get_vector_store(session_id: str) -> VectorStoreManager:
-    """Return a vector store with a per-session collection (isolated per user)."""
-    return VectorStoreManager(collection_name=f"{COLLECTION_NAME}_{session_id}")
+    """Return a vector store with a per-session collection (isolated per user).
+
+    The heavy client + embedding model are shared across sessions; only the
+    collection differs, so memory does not grow per user.
+    """
+    return VectorStoreManager(
+        collection_name=f"{COLLECTION_NAME}_{session_id}",
+        client=get_chroma_client(),
+        embedding_fn=get_embedding_fn(),
+    )
 
 
 @st.cache_resource(show_spinner=False, max_entries=100)

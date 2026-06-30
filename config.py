@@ -57,7 +57,10 @@ TOP_K_RESULTS = 5          # number of chunks to retrieve (lower = fewer tokens/
 SIMILARITY_THRESHOLD = 0.3  # minimum relevance score
 
 # Reranking — a cross-encoder re-scores candidates for better precision.
-RERANK_ENABLED = True
+# Disabled by default because the cross-encoder is a SECOND transformer model;
+# on small/free hosts (e.g. Streamlit Community Cloud) the extra RAM can OOM the
+# app. Set to True locally or on a larger instance for better retrieval quality.
+RERANK_ENABLED = False
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANK_CANDIDATES = 20     # candidates fetched before reranking down to TOP_K
 

@@ -22,17 +22,21 @@ logger = get_logger(__name__)
 class VectorStoreManager:
     """Manage a persistent ChromaDB collection of research-paper chunks."""
 
-    def __init__(self, collection_name: str = COLLECTION_NAME) -> None:
-        """Initialise the persistent client, embedding function, and collection.
+    def __init__(self, collection_name: str = COLLECTION_NAME, client=None, embedding_fn=None) -> None:
+        """Initialise the collection, reusing a shared client/embedding model.
 
         Args:
             collection_name: ChromaDB collection to use. Pass a per-session name
                 to isolate each user's knowledge base.
+            client: A shared ChromaDB client. If None, one is created.
+            embedding_fn: A shared embedding function. If None, one is created.
+                Sharing these across sessions avoids loading the embedding model
+                once per user (which otherwise exhausts memory on small hosts).
         """
         os.makedirs(CHROMA_PERSIST_DIR, exist_ok=True)
-        self.client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+        self.client = client or chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
         # Local sentence-transformers embeddings — no API key required.
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+        self.embedding_fn = embedding_fn or embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name=EMBEDDING_MODEL
         )
         self.collection = self.client.get_or_create_collection(
