@@ -56,11 +56,18 @@ STATIC_DIR = "./static"   # served by Streamlit for in-browser PDF viewing
 TOP_K_RESULTS = 5          # number of chunks to retrieve (lower = fewer tokens/call)
 SIMILARITY_THRESHOLD = 0.3  # minimum relevance score
 
-# Reranking — a cross-encoder re-scores candidates for better precision.
-# Disabled by default because the cross-encoder is a SECOND transformer model;
-# on small/free hosts (e.g. Streamlit Community Cloud) the extra RAM can OOM the
-# app. Set to True locally or on a larger instance for better retrieval quality.
-RERANK_ENABLED = False
+# Reranking — a cross-encoder re-scores candidates for better precision. It
+# loads a SECOND transformer model, so on tiny hosts (~1 GB, e.g. Streamlit
+# Community Cloud) it can OOM the app. Default ON (fine on Hugging Face Spaces,
+# ~16 GB); set the env/secret RERANK_ENABLED="false" to disable on small hosts.
+def _as_bool(value: str | None, default: bool = True) -> bool:
+    """Parse a truthy string env/secret value."""
+    if value is None:
+        return default
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+RERANK_ENABLED = _as_bool(get_secret("RERANK_ENABLED"), default=True)
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANK_CANDIDATES = 20     # candidates fetched before reranking down to TOP_K
 
