@@ -11,6 +11,7 @@ from config import (
     DAILY_WINDOW,
     FETCH_LIMIT_PER_SESSION,
     GROQ_API_KEY,
+    PAPERS_DIR,
     RATE_LIMIT_GLOBAL,
     RATE_LIMIT_GLOBAL_DAILY,
     RATE_LIMIT_PER_SESSION,
@@ -370,11 +371,12 @@ def render_sidebar(vector_store: VectorStoreManager) -> None:
                     f"⬆️ **{truncate(paper['title'], 60)}**  \n_(your upload)_"
                 )
             else:
-                # Title links to the live arxiv abstract page (opens in a new tab).
-                url = f"https://arxiv.org/abs/{paper['arxiv_id']}"
+                # Link straight to the PDF on arxiv (opens in a new tab).
+                pdf_url = f"https://arxiv.org/pdf/{paper['arxiv_id']}"
+                abs_url = f"https://arxiv.org/abs/{paper['arxiv_id']}"
                 st.markdown(
-                    f"📄 **[{truncate(paper['title'], 60)}]({url})**  \n"
-                    f"[Read on arxiv ↗]({url})",
+                    f"📄 **[{truncate(paper['title'], 60)}]({pdf_url})**  \n"
+                    f"[Open PDF ↗]({pdf_url}) · [Abstract]({abs_url})",
                     unsafe_allow_html=False,
                 )
         with col2:
@@ -418,15 +420,24 @@ def _split_report(report: str) -> tuple[str, str]:
     return body, suggestions
 
 
-def render_pdf_viewer(review: dict) -> None:
-    """Render the uploaded PDF inline (base64) plus a download button.
+def _arxiv_pdf_url(arxiv_id: str) -> str:
+    """Direct link to a paper's PDF on arxiv."""
+    return f"https://arxiv.org/pdf/{arxiv_id}"
+
+
+def _arxiv_pdf_path(arxiv_id: str) -> str:
+    """Local path of a downloaded arxiv PDF (matches paper_fetcher naming)."""
+    return os.path.join(PAPERS_DIR, f"{arxiv_id.replace('/', '_')}.pdf")
+
+
+def _show_pdf(path: str | None, title: str, key: str) -> None:
+    """Inline-render a local PDF (base64) plus a download button.
 
     Uses a base64 data URI rather than Streamlit static serving, which is
     unreliable behind hosting proxies (e.g. Hugging Face Spaces).
     """
-    path = review.get("local_path")
     if not path or not os.path.exists(path):
-        st.caption("PDF file is no longer available (the app may have restarted).")
+        st.caption("PDF not available locally (the app may have restarted).")
         return
 
     with open(path, "rb") as fh:
@@ -435,18 +446,22 @@ def render_pdf_viewer(review: dict) -> None:
     st.download_button(
         "⬇️ Download PDF",
         data,
-        file_name=f"{review.get('title', 'paper')}.pdf",
+        file_name=f"{title}.pdf",
         mime="application/pdf",
         use_container_width=True,
+        key=f"dl_{key}",
     )
-
-    # Inline preview via base64 data URI (works without static serving).
     b64 = base64.b64encode(data).decode()
     st.markdown(
         f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="600" '
         f'style="border:1px solid #ddd;border-radius:8px;"></iframe>',
         unsafe_allow_html=True,
     )
+
+
+def render_pdf_viewer(review: dict) -> None:
+    """Render the uploaded paper's PDF inline."""
+    _show_pdf(review.get("local_path"), review.get("title", "paper"), key="upload")
 
 
 def render_review_tab() -> None:
@@ -488,11 +503,15 @@ def render_review_tab() -> None:
 
     related = review.get("related_papers", [])
     if related:
-        links = ", ".join(
-            f"[{truncate(p['title'], 40)}](https://arxiv.org/abs/{p['arxiv_id']})"
-            for p in related
-        )
-        st.caption(f"Related work fetched from arxiv: {links}")
+        st.markdown("**📚 Related work fetched from arxiv** (expand to read the PDF):")
+        for p in related:
+            with st.expander(f"📄 {truncate(p['title'], 70)}  ·  arxiv:{p['arxiv_id']}"):
+                st.markdown(f"[Open PDF on arxiv ↗]({_arxiv_pdf_url(p['arxiv_id'])})")
+                try:
+                    _show_pdf(_arxiv_pdf_path(p["arxiv_id"]), p["title"], key=f"rel_{p['arxiv_id']}")
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Related PDF view failed: %s", exc)
+                    st.caption("Couldn't display this PDF inline — use the arxiv link above.")
 
     # The review text is the important part — render it FIRST, full width, so
     # nothing below (export buttons, PDF viewer) can blank it out if it errors.
@@ -870,10 +889,10 @@ def _render_meta(meta: dict) -> None:
                 if src.get("is_own"):
                     st.markdown(f"- 📄 **Your paper** — _{section}_")
                 elif src.get("arxiv_id"):
-                    url = f"https://arxiv.org/abs/{src['arxiv_id']}"
+                    url = f"https://arxiv.org/pdf/{src['arxiv_id']}"
                     st.markdown(
                         f"- **{src.get('title', 'Unknown')}** — _{section}_ "
-                        f"([arxiv:{src['arxiv_id']} ↗]({url}))"
+                        f"([PDF ↗]({url}))"
                     )
                 else:
                     st.markdown(f"- **{src.get('title', 'Unknown')}** — _{section}_")
