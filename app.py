@@ -1,4 +1,5 @@
 """ScholarAgent — Streamlit frontend and main entry point."""
+import base64
 import os
 import uuid
 
@@ -418,33 +419,31 @@ def _split_report(report: str) -> tuple[str, str]:
 
 
 def render_pdf_viewer(review: dict) -> None:
-    """Render the uploaded PDF inline plus open/download controls."""
-    paper_id = review["paper_id"]
-    static_url = f"app/static/{paper_id}.pdf"
+    """Render the uploaded PDF inline (base64) plus a download button.
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(
-            f'<a href="{static_url}" target="_blank" '
-            f'style="text-decoration:none;font-weight:600;">🔗 Open PDF full page ↗</a>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        try:
-            with open(review["local_path"], "rb") as fh:
-                st.download_button(
-                    "⬇️ Download PDF",
-                    fh.read(),
-                    file_name=f"{review['title']}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                )
-        except Exception:  # noqa: BLE001
-            pass
+    Uses a base64 data URI rather than Streamlit static serving, which is
+    unreliable behind hosting proxies (e.g. Hugging Face Spaces).
+    """
+    path = review.get("local_path")
+    if not path or not os.path.exists(path):
+        st.caption("PDF file is no longer available (the app may have restarted).")
+        return
 
-    # Inline viewer (served via Streamlit static serving).
+    with open(path, "rb") as fh:
+        data = fh.read()
+
+    st.download_button(
+        "⬇️ Download PDF",
+        data,
+        file_name=f"{review.get('title', 'paper')}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
+
+    # Inline preview via base64 data URI (works without static serving).
+    b64 = base64.b64encode(data).decode()
     st.markdown(
-        f'<iframe src="{static_url}" width="100%" height="700" '
+        f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="600" '
         f'style="border:1px solid #ddd;border-radius:8px;"></iframe>',
         unsafe_allow_html=True,
     )
@@ -495,22 +494,30 @@ def render_review_tab() -> None:
         )
         st.caption(f"Related work fetched from arxiv: {links}")
 
-    render_review_export(review)
+    # The review text is the important part — render it FIRST, full width, so
+    # nothing below (export buttons, PDF viewer) can blank it out if it errors.
+    st.markdown("#### 📝 Review")
+    body, suggestions = _split_report(review.get("report", "") or "")
+    st.markdown(body or "_No review text was produced — try re-analysing._")
+    if suggestions:
+        st.markdown("### 🛠️ Improvement Suggestions (action items)")
+        st.warning(suggestions)
 
-    pdf_col, review_col = st.columns([1, 1], gap="medium")
-    with pdf_col:
-        st.markdown("#### 📄 Your Paper")
-        if review.get("paper_id"):
-            render_pdf_viewer(review)
-        else:
-            st.caption("Re-run the analysis to view the PDF here.")
-    with review_col:
-        st.markdown("#### 📝 Review")
-        body, suggestions = _split_report(review["report"])
-        st.markdown(body)
-        if suggestions:
-            st.markdown("### 🛠️ Improvement Suggestions (action items)")
-            st.warning(suggestions)
+    # Export buttons — isolated so a PDF/export hiccup can't break the page.
+    try:
+        render_review_export(review)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Review export failed: %s", exc)
+        st.caption("Export is temporarily unavailable.")
+
+    # PDF viewer — isolated, in an expander, base64 (no static-serving dependency).
+    if review.get("paper_id"):
+        with st.expander("📄 View your uploaded PDF"):
+            try:
+                render_pdf_viewer(review)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("PDF viewer failed: %s", exc)
+                st.caption("Couldn't display the PDF inline — try downloading it.")
 
     st.divider()
     st.info(
@@ -603,16 +610,20 @@ def render_compare_tab(vector_store: VectorStoreManager) -> None:
             if not get_global_limiters()["chat_daily"].allow():
                 st.warning("Daily free-tier cap reached — try again later.")
             else:
-                title_by_id = {p["arxiv_id"]: p["title"] for p in papers}
-                docs = [
-                    {"title": title_by_id.get(pid, pid), "text": vector_store.get_paper_text(pid)}
-                    for pid in selected
-                ]
-                with st.spinner("Comparing papers across key aspects…"):
-                    st.session_state["comparison_result"] = {
-                        "ids": selected,
-                        "markdown": compare_papers_table(docs),
-                    }
+                try:
+                    title_by_id = {p["arxiv_id"]: p["title"] for p in papers}
+                    docs = [
+                        {"title": title_by_id.get(pid, pid), "text": vector_store.get_paper_text(pid)}
+                        for pid in selected
+                    ]
+                    with st.spinner("Comparing papers across key aspects…"):
+                        st.session_state["comparison_result"] = {
+                            "ids": selected,
+                            "markdown": compare_papers_table(docs),
+                        }
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Comparison failed: %s", exc)
+                    st.error(f"Comparison failed: {exc}")
     else:
         st.caption("Select two or more papers above to enable comparison.")
 
@@ -624,8 +635,12 @@ def render_compare_tab(vector_store: VectorStoreManager) -> None:
     # Metrics matrix for the selected papers (regex-based, no LLM call).
     if selected:
         st.divider()
-        title_by_id = {p["arxiv_id"]: p["title"] for p in papers}
-        render_metrics_matrix(vector_store, selected, title_by_id)
+        try:
+            title_by_id = {p["arxiv_id"]: p["title"] for p in papers}
+            render_metrics_matrix(vector_store, selected, title_by_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Metrics matrix failed: %s", exc)
+            st.caption("Couldn't extract metrics for the selected papers.")
 
 
 _AVATARS = {"user": "🧑", "assistant": "📚"}

@@ -1,0 +1,46 @@
+name: Sync to Hugging Face Space
+
+# Deploys to the HF Space on every push to main. It pushes a SINGLE clean commit
+# (history flattened, binary screenshots removed) because HF Spaces reject raw
+# binary files that aren't in Git LFS.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # allow manual runs from the Actions tab
+
+# HF_USERNAME / HF_SPACE can be overridden via repo Variables; defaults below.
+env:
+  HF_SPACE: ${{ vars.HF_SPACE || 'ms732/ScholarAgent' }}
+  HF_USERNAME: ${{ vars.HF_USERNAME || 'ms732' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Push clean snapshot to HF Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN secret is not set. Add it in repo Settings → Secrets → Actions."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Remove binaries HF rejects (screenshots are GitHub-only).
+          rm -rf docs/images
+
+          # Build one clean commit with no prior (binary) history.
+          git checkout --orphan hf-deploy
+          git add -A
+          git commit -m "Deploy ${GITHUB_SHA::7} from GitHub Actions"
+
+          # Force-push as the Space's main branch.
+          git push --force \
+            "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" \
+            hf-deploy:main
