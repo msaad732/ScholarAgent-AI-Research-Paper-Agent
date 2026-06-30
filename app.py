@@ -606,11 +606,24 @@ def render_metrics_matrix(
 def render_compare_tab(vector_store: VectorStoreManager) -> None:
     """Render the 'Compare' tab: pick papers, compare side-by-side, see metrics."""
     papers = vector_store.get_all_papers()
+    logger.info(
+        "Compare tab: session=%s, %d papers: %s",
+        get_session_id(),
+        len(papers),
+        [(p.get("arxiv_id"), p.get("source_type")) for p in papers],
+    )
     if len(papers) < 2:
-        st.info(
-            "🔀 Add at least two papers (fetch from arxiv or upload your own) to "
-            "compare them here."
-        )
+        st.info("🔀 You need **at least two papers** in your knowledge base to compare.")
+        if papers:
+            have = "; ".join(
+                f"**{truncate(p['title'], 45)}** ({p.get('source_type', 'arxiv')})"
+                for p in papers
+            )
+            st.caption(f"You currently have: {have}.")
+            st.caption(
+                "Upload another paper, increase **Related papers to fetch** when "
+                "analyzing, or fetch a few from arxiv in the sidebar — then compare."
+            )
         return
 
     labels = {
